@@ -342,36 +342,92 @@ class MockLLMProvider(BaseLLMProvider):
                     ],
                     "panel_scripts": [
                         {
+                            "page_number": 1,
                             "panel_number": 1,
-                            "script": f"Wide establishing shot setting the world of {title}.",
-                            "image_prompt": f"Wide panoramic manga establishing shot, {title} environment under dramatic sky, high contrast ink lineart, crisp screentones",
+                            "camera_shot": "Wide panoramic establishing shot",
+                            "characters_present": [],
+                            "script": f"Wide panoramic establishing view setting the atmospheric world of {title} under stormy dramatic skies.",
+                            "image_prompt": f"Wide panoramic establishing manga shot, ancient dramatic landscape of {title}, dark swirling storm clouds, distant ruined architecture, high contrast ink lineart, screentones",
                             "dialogue": [],
-                            "narration": [{"text": f"The story unfolds in {title}.", "box_type": "caption", "x": 6.0, "y": 6.0}],
-                            "sound_effects": [{"text": "WHOOOSH", "sfx_type": "ambient", "x": 65.0, "y": 20.0, "size": "large"}]
+                            "narration": [{"text": f"The story unfolds under darkening skies in {title}.", "box_type": "caption", "x": 6.0, "y": 6.0}],
+                            "sound_effects": [{"text": "WHOOOOSH", "sfx_type": "ambient", "x": 70.0, "y": 15.0, "size": "large"}]
                         },
                         {
+                            "page_number": 1,
                             "panel_number": 2,
-                            "script": f"Inciting moment: {p} steps forward, analyzing the surroundings.",
-                            "image_prompt": f"Medium manga panel, {p} stepping forward with determination, detailed hair and outfit, screentone shading",
-                            "dialogue": [{"speaker_name": p, "text": "Something isn't right here. We need to stay alert.", "bubble_type": "speech", "x": 20.0, "y": 15.0}],
+                            "camera_shot": "Medium action shot",
+                            "characters_present": [p],
+                            "script": f"Medium shot of {p} stepping forward through the ruins with intense purpose, analyzing the environment.",
+                            "image_prompt": f"Medium manga panel, {p} stepping forward with determination, hand resting on weapon, wind blowing hair, atmospheric shadow screentones",
+                            "dialogue": [{"speaker_name": p, "text": "The signs are clear. We're running out of time.", "bubble_type": "speech", "x": 20.0, "y": 15.0}],
                             "narration": [],
-                            "sound_effects": [{"text": "THUMP", "sfx_type": "dramatic", "x": 70.0, "y": 65.0, "size": "medium"}]
+                            "sound_effects": [{"text": "STEP", "sfx_type": "subtle", "x": 65.0, "y": 70.0, "size": "small"}]
                         },
                         {
+                            "page_number": 1,
                             "panel_number": 3,
-                            "script": f"Rising confrontation: An unexpected rival ambushes from the mist.",
-                            "image_prompt": f"Action manga panel, opposing warrior striking forward through smoke, dynamic diagonal angle, impact debris",
-                            "dialogue": [{"speaker_name": "Rival", "text": "Your search ends here!", "bubble_type": "shout", "x": 25.0, "y": 18.0}],
+                            "camera_shot": "Low-angle Dutch tilt shot",
+                            "characters_present": [s],
+                            "script": f"Low-angle dynamic shot: An ominous presence emerges from the smoke as {s} arrives to block the path.",
+                            "image_prompt": f"Dynamic low-angle tilted manga panel, shadowy rival emerging through thick swirling mist, weapon gleaming in moonlight, heavy shadow inking",
+                            "dialogue": [{"speaker_name": s, "text": "Did you really believe you could pass unnoticed?", "bubble_type": "speech", "x": 25.0, "y": 16.0}],
                             "narration": [],
-                            "sound_effects": [{"text": "BASHHH!", "sfx_type": "impact", "x": 50.0, "y": 50.0, "size": "large"}]
+                            "sound_effects": [{"text": "RUMBLE", "sfx_type": "dramatic", "x": 55.0, "y": 50.0, "size": "medium"}]
                         },
                         {
+                            "page_number": 1,
                             "panel_number": 4,
-                            "script": f"Climactic clash: {p} unleashes their signature power to turn the tide.",
-                            "image_prompt": f"Epic climactic manga splash panel, {p} unleashing full power strike, radiating celestial aura, speedlines, masterpiece art",
-                            "dialogue": [{"speaker_name": p, "text": "SPIRIT BLADE, STRIKE!", "bubble_type": "shout", "x": 60.0, "y": 20.0}],
+                            "camera_shot": "Extreme close-up shot",
+                            "characters_present": [p],
+                            "script": f"Page-turn cliffhanger: Extreme close-up of {p}'s eyes blazing with resolute determination.",
+                            "image_prompt": f"Extreme close-up manga panel, {p}'s eyes burning with intense resolve, detailed iris shading, sweat and grit, dramatic speedlines radiating outward",
+                            "dialogue": [{"speaker_name": p, "text": "I won't let you stand in my way!", "bubble_type": "shout", "x": 20.0, "y": 15.0}],
                             "narration": [],
-                            "sound_effects": [{"text": "ZKKKKKK!", "sfx_type": "impact", "x": 15.0, "y": 40.0, "size": "huge"}]
+                            "sound_effects": [{"text": "SHRRRNK", "sfx_type": "tension", "x": 75.0, "y": 45.0, "size": "medium"}]
+                        },
+                        {
+                            "page_number": 2,
+                            "panel_number": 5,
+                            "camera_shot": "Dynamic two-shot combat stance",
+                            "characters_present": [p, s],
+                            "script": f"Opening of Page 2: Wide-medium two-shot, {p} and {s} squaring off at close range, energy sparking between them.",
+                            "image_prompt": f"Dynamic two-shot manga panel, two warriors facing each other in combat stances, crackling aura energy between them, fractured ground, dramatic cross-hatching",
+                            "dialogue": [{"speaker_name": s, "text": "Then prove your conviction!", "bubble_type": "shout", "x": 20.0, "y": 15.0}],
+                            "narration": [],
+                            "sound_effects": [{"text": "BZZZZT", "sfx_type": "tension", "x": 48.0, "y": 50.0, "size": "medium"}]
+                        },
+                        {
+                            "page_number": 2,
+                            "panel_number": 6,
+                            "camera_shot": "Over-the-shoulder action angle",
+                            "characters_present": [p],
+                            "script": f"Over-the-shoulder angle: {p} channels inner power into a strike, energy swirling around the fist/blade.",
+                            "image_prompt": f"Over-the-shoulder manga panel, {p} gathering radiant aura around weapon, dynamic foreshortening, glowing technique, high contrast inking",
+                            "dialogue": [{"speaker_name": p, "text": "Take this!", "bubble_type": "shout", "x": 55.0, "y": 15.0}],
+                            "narration": [],
+                            "sound_effects": [{"text": "VRRRRR", "sfx_type": "charge", "x": 30.0, "y": 60.0, "size": "large"}]
+                        },
+                        {
+                            "page_number": 2,
+                            "panel_number": 7,
+                            "camera_shot": "Epic diagonal action splash",
+                            "characters_present": [p, s],
+                            "script": f"CLIMACTIC CLASH: Devastating strike collision, explosive impact sending shockwaves and shattered debris across the page.",
+                            "image_prompt": f"Epic climactic diagonal action manga splash panel, explosive weapon strike collision, massive shockwave ripples, flying rock fragments, radiant speedlines, masterpiece manga art",
+                            "dialogue": [],
+                            "narration": [],
+                            "sound_effects": [{"text": "BOOOOM!", "sfx_type": "impact", "x": 45.0, "y": 45.0, "size": "huge"}]
+                        },
+                        {
+                            "page_number": 2,
+                            "panel_number": 8,
+                            "camera_shot": "Atmospheric aftermath shot",
+                            "characters_present": [p],
+                            "script": f"Chapter resolution: The smoke clears as {p} stands firm, looking toward the dawn with new resolve.",
+                            "image_prompt": f"Atmospheric medium-wide manga panel, smoke clearing around {p} standing resolute, dawn light breaking through clouds, quiet aftermath, detailed manga screentone",
+                            "dialogue": [{"speaker_name": p, "text": "This is only the first step.", "bubble_type": "thought", "x": 20.0, "y": 20.0}],
+                            "narration": [{"text": "The trial was survived, but greater shadows lay ahead.", "box_type": "caption", "x": 6.0, "y": 75.0}],
+                            "sound_effects": [{"text": "FWHHH", "sfx_type": "wind", "x": 75.0, "y": 25.0, "size": "small"}]
                         }
                     ]
                 }

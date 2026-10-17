@@ -219,9 +219,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Local documentation & run commands
-/docs/
-
 # Local media storage & sqlite databases
 media/
 backend/media/

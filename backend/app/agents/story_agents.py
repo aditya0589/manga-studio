@@ -99,9 +99,16 @@ async def character_world_bible_node(state: MangaWorkflowState) -> Dict[str, Any
 
     system_prompt = (
         "You are the Character and World Bible Agent for AI Manga Studio. "
-        "Generate canonical character profiles (Protagonist, Antagonist, Allies) with distinct visual rules: "
-        "hair, eyes, clothing, recurring accessories, and visual consistency rules for image generation. "
-        "Also list core world rules. Respond strictly in valid JSON format with keys: "
+        "Generate canonical character profiles (Protagonist, Antagonist, Allies). "
+        "CRITICAL FOR IMAGE CONSISTENCY: Each character MUST have immutable, concrete visual features: "
+        "- 'hair': exact cut, style, length, and color (e.g. 'spiky jet-black hair with twin temple bangs') "
+        "- 'eyes': exact iris color and eye shape (e.g. 'sharp amber-gold eyes, thin cross scar under left eye') "
+        "- 'clothing': exact signature outfit with specific garments and colors (e.g. 'high-collared charcoal sleeveless tunic over white long-sleeve shirt, dark grey pants') "
+        "- 'accessories': list of specific signature items (e.g. ['black fingerless combat gloves', 'crimson waist sash']) "
+        "- 'visual_consistency_rules': list of 1-2 rules (e.g. ['Always wears crimson waist sash', 'Never removes left glove']) "
+        "- 'appearance': a concise 2-sentence summary combining hair, eyes, facial features, and signature outfit. "
+        "DO NOT use vague words like 'stylish' or 'cool'. Provide concrete physical descriptions so image diffusion models can draw the character identically in every panel. "
+        "Respond strictly in valid JSON format with keys: "
         "'canonical_characters' (list of {name, role, personality, appearance, canon_data: {hair, eyes, clothing, accessories, visual_consistency_rules}}), "
         "'world_rules' (list of strings), 'factions_and_locations' (list)."
     )
@@ -111,7 +118,7 @@ async def character_world_bible_node(state: MangaWorkflowState) -> Dict[str, Any
         f"Synopsis: {state.get('synopsis')}\n"
         f"Genre: {state.get('genre')}\n"
         f"Existing Characters: {[c.get('name') for c in state.get('canonical_characters', [])]}\n"
-        "Generate canonical characters with rich visual details."
+        "Generate canonical characters with exact physical and costume visual anchors for image consistency."
     )
 
     result = await llm.generate_text(

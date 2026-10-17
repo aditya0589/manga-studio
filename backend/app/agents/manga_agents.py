@@ -8,6 +8,54 @@ from app.storage import storage, compute_checksum
 from app.core.logging import logger
 from app.workers.job_manager import job_manager
 
+def build_character_visual_fingerprint(c: Dict[str, Any]) -> str:
+    """Extracts an invariant, concrete visual anchor string combining hair, eyes,
+    facial marks, signature clothing, and accessories so diffusion models generate
+    the exact same character design across all panels and pages."""
+    if not isinstance(c, dict):
+        return ""
+    name = str(c.get("name", "")).strip()
+    canon = c.get("canon_data") or {}
+    if not isinstance(canon, dict):
+        canon = {}
+
+    hair = canon.get("hair")
+    eyes = canon.get("eyes")
+    clothing = canon.get("clothing")
+    accessories = canon.get("accessories")
+    if isinstance(accessories, list):
+        accessories = ", ".join(str(a) for a in accessories)
+
+    rules = canon.get("visual_consistency_rules")
+    if isinstance(rules, list) and rules:
+        rule_str = str(rules[0])
+    else:
+        rule_str = ""
+
+    traits = []
+    if hair:
+        h_str = str(hair).strip()
+        traits.append(h_str if "hair" in h_str.lower() else f"{h_str} hair")
+    if eyes:
+        e_str = str(eyes).strip()
+        traits.append(e_str if "eye" in e_str.lower() else f"{e_str} eyes")
+    if clothing:
+        c_str = str(clothing).strip()
+        traits.append(c_str if any(w in c_str.lower() for w in ("wearing", "outfit", "tunic", "coat", "robe", "jacket", "shirt", "hoodie")) else f"wearing {c_str}")
+    if accessories:
+        traits.append(f"with {accessories}")
+    if rule_str:
+        traits.append(rule_str)
+
+    if traits:
+        return f"{name}: {', '.join(traits)}"
+
+    # Fallback to appearance if detailed canon_data fields are empty
+    app = str(c.get("appearance", "")).strip()
+    if app:
+        return f"{name}: {app}"
+    return name
+
 async def scene_dialogue_node(state: MangaWorkflowState) -> Dict[str, Any]:
     """Agent 5: Scene and Dialogue Agent
     Converts outlines into detailed scenes with actions and separated character dialogue.
@@ -109,9 +157,10 @@ async def scene_dialogue_node(state: MangaWorkflowState) -> Dict[str, Any]:
 
 async def manga_director_node(state: MangaWorkflowState) -> Dict[str, Any]:
     """Agent 6: Manga Director Agent
-    Transforms scenes into panel-by-panel manga director scripts with camera angle, composition,
-    character poses, speech bubble placement, and Japanese/English sound effects.
-    Generates 6 panels per page for richer story pacing."""
+    Transforms scenes into a structured 8-panel, 2-page manga sequence.
+    Page 1: 4 panels (Hook, Introduction, Rising Tension, Page-Turn Cliffhanger).
+    Page 2: 4 panels (Escalation, Face-Off, Climax Impact, Chapter Resolution).
+    Guarantees every panel has a unique shot composition, distinct prompt, and continuous story flow."""
     logger.info("Executing Agent 6: Manga Director Agent")
     job_id = state.get("job_id")
     if job_id:
@@ -119,7 +168,7 @@ async def manga_director_node(state: MangaWorkflowState) -> Dict[str, Any]:
             job_id,
             "stage_started",
             {
-                "stage": "🎬 Manga Director Agent: Directing 6-panel compositions and shot angles...",
+                "stage": "🎬 Manga Director Agent: Directing 8-panel multi-page compositions and shot angles...",
                 "progress": 50
             }
         )
@@ -127,7 +176,6 @@ async def manga_director_node(state: MangaWorkflowState) -> Dict[str, Any]:
     llm = get_llm_provider()
 
     scenes = state.get('scenes', [])
-    # Build a compact scene breakdown for the director
     scene_summary = ""
     for s in scenes:
         script = s.get('script', {})
@@ -139,23 +187,31 @@ async def manga_director_node(state: MangaWorkflowState) -> Dict[str, Any]:
             f"  Dialogue: {[d.get('text', '')[:60] for d in script.get('dialogue', [])[:2]]}\n"
         )
 
+    canonical_chars = state.get('canonical_characters', [])
+    char_fingerprints = [build_character_visual_fingerprint(c) for c in canonical_chars if c.get("name")]
+    protagonist = next((c.get("name") for c in canonical_chars if c.get("role", "").lower() in ("protagonist", "lead")), "Protagonist")
+    rival = next((c.get("name") for c in canonical_chars if c.get("role", "").lower() in ("antagonist", "rival", "supporting")), "Rival")
+
     system_prompt = (
-        "You are the Manga Director Agent for AI Manga Studio. "
-        "Direct 4 to 6 page panels that tell a continuous, sequential manga story with progressive pacing. "
-        "CRITICAL: Every panel must depict a DIFFERENT, progressive beat of the story. Do NOT repeat the same shot, action, or prompt. "
-        "Progression guideline: "
-        "- Panel 1: Establishing environment / world setting where the scene begins. "
-        "- Panel 2: Character introduction or inciting action in this setting. "
-        "- Panel 3: Rising conflict, confrontation, arrival of a rival/obstacle, or dramatic reaction. "
-        "- Panel 4+: Escalating action, high-energy clash, and climactic emotional peak or cliffhanger. "
-        "Each panel MUST have: "
-        "'panel_number' (integer), "
-        "'script' (cinematic description of the shot angle and what is happening in the scene), "
-        "'image_prompt' (crisp visual prompt describing characters, specific actions, camera perspective, and lighting for art synthesis), "
-        "'dialogue' (list of {speaker_name, text, bubble_type: 'speech'|'thought'|'shout', x, y}), "
-        "'narration' (optional list of {text, box_type, x, y}), "
-        "'sound_effects' (optional list of {text, sfx_type, x, y, size}). "
-        "Respond STRICTLY in valid JSON format with key: 'panel_scripts'."
+        "You are the Lead Manga Director Agent for AI Manga Studio. "
+        "Direct an 8-panel manga sequence across exactly 2 full pages (Page 1: Panels 1-4, Page 2: Panels 5-8) with dynamic visual storytelling. "
+        "CRITICAL RULES FOR PROMPT VARIETY AND CONTINUOUS SEQUENTIAL PACING: "
+        "1. Every single panel must have a COMPLETELY DIFFERENT camera shot and action. Do NOT repeat poses, angles, or compositions. "
+        "2. PAGE 1 (Panels 1-4) — DISCOVERY & RISING CRISIS: "
+        "   - Panel 1: Wide cinematic establishing shot of the location/environment (weather, architecture, atmosphere). NO character portraits. "
+        "   - Panel 2: Medium action shot (protagonist interacting with setting, holding a signature item/weapon, stepping into danger). "
+        "   - Panel 3: Low-angle or Dutch tilt tension shot (arrival of adversary, discovery of dark truth, sudden confrontation). "
+        "   - Panel 4: Page-turn cliffhanger shot (extreme close-up of fierce eyes, or split-second reaction before an attack). "
+        "3. PAGE 2 (Panels 5-8) — ESCALATION, CLASH & RESOLUTION: "
+        "   - Panel 5: Immediate combat stance or defensive reaction continuing directly from Page 1's cliffhanger (wide-medium two-shot). "
+        "   - Panel 6: Over-the-shoulder or close-up character expression (intense dialogue clash, sweat and grit, fierce resolve). "
+        "   - Panel 7: High-speed action impact / splash panel (diagonal motion lines, weapon clash, magical aura, debris flying). "
+        "   - Panel 8: Chapter hook / aftermath panel (smoke clearing, quiet realization, dramatic silhouette setting up next chapter). "
+        "4. Visual prompts in 'image_prompt' MUST specify: camera angle, character action/pose, lighting, and background setting. "
+        "5. Respond STRICTLY in valid JSON format with key: 'panel_scripts' containing a list of 8 objects: "
+        "{'page_number': int (1 or 2), 'panel_number': int (1-8), 'camera_shot': str, 'characters_present': [str], "
+        "'script': str, 'image_prompt': str, 'dialogue': [{speaker_name, text, bubble_type, x, y}], "
+        "'narration': [{text, box_type, x, y}], 'sound_effects': [{text, sfx_type, x, y, size}]}."
     )
     user_prompt = (
         f"Project Title: {state.get('project_title') or 'Manga Story'}\n"
@@ -163,12 +219,11 @@ async def manga_director_node(state: MangaWorkflowState) -> Dict[str, Any]:
         f"Story Premise: {state.get('story_premise', '')[:300]}\n"
         f"Genre: {state.get('genre', 'Action Fantasy')}\n"
         f"Art Style: {state.get('art_style', 'Traditional Manga B&W')}\n"
-        f"Characters: {[c.get('name') for c in state.get('canonical_characters', [])[:4]]}\n"
-        f"Character Visuals: {[c.get('name') + ': ' + c.get('appearance', '')[:80] for c in state.get('canonical_characters', [])[:4]]}\n"
+        f"Characters & Visual Anchors:\n" + "\n".join(f"- {f}" for f in char_fingerprints[:4]) + "\n"
         f"Chapter Beats: {state.get('chapter_outline', {}).get('beats', [])}\n"
         f"Scenes Breakdown:\n{scene_summary}\n"
-        "Direct the page panels for this chapter following the progressive story flow above. "
-        "Ensure each panel's image_prompt and dialogue distinctly advances the story from the previous panel."
+        "Direct all 8 panels across 2 pages (Page 1: Panels 1-4, Page 2: Panels 5-8). "
+        "Ensure each panel's image_prompt and dialogue distinctly advances the story with varied cinematography."
     )
 
     result = await llm.generate_text(
@@ -181,55 +236,101 @@ async def manga_director_node(state: MangaWorkflowState) -> Dict[str, Any]:
     data = result.get("parsed_json") or {}
     panel_scripts = data.get("panel_scripts") or state.get("panel_scripts") or []
 
-    if not panel_scripts:
+    # Dynamic fallback: ensure 8 full, varied panels across 2 pages if LLM fails or returns too few panels
+    if not panel_scripts or len(panel_scripts) < 4:
+        title = state.get("project_title") or "Manga Story"
+        ch_title = state.get("chapter_title") or "Chapter 1"
+        p_name = protagonist
+        r_name = rival
+
         panel_scripts = [
             {
+                "page_number": 1,
                 "panel_number": 1,
-                "script": "WIDE SHOT — panoramic establishing view of the location under dramatic sky.",
-                "image_prompt": "Wide panoramic manga establishing shot, dramatic stormy sky, high contrast ink lineart, crisp screentones, full-width splash panel",
+                "camera_shot": "Wide panoramic establishing shot",
+                "characters_present": [],
+                "script": f"Wide panoramic establishing view setting the atmospheric world of {title} under stormy dramatic skies.",
+                "image_prompt": f"Wide panoramic establishing manga shot, ancient dramatic landscape of {title}, dark swirling storm clouds, distant ruined architecture, high contrast ink linework, screentones",
                 "dialogue": [],
-                "narration": [{"text": "The city never sleeps — and tonight, neither would he.", "box_type": "caption", "x": 5.0, "y": 5.0}],
-                "sound_effects": [{"text": "ROOOAAAR", "sfx_type": "ambient", "x": 70.0, "y": 15.0, "size": "large"}]
+                "narration": [{"text": f"The story unfolds under darkening skies in {title}.", "box_type": "caption", "x": 6.0, "y": 6.0}],
+                "sound_effects": [{"text": "WHOOOOSH", "sfx_type": "ambient", "x": 70.0, "y": 15.0, "size": "large"}]
             },
             {
+                "page_number": 1,
                 "panel_number": 2,
-                "script": "Medium shot of protagonist entering the scene with purpose.",
-                "image_prompt": "Medium manga panel, hero silhouette backlit, intense determination, bold ink outline, screentone shading",
-                "dialogue": [{"speaker_name": "Hero", "text": "I've been waiting for this moment.", "bubble_type": "speech", "x": 20.0, "y": 15.0}],
+                "camera_shot": "Medium action shot",
+                "characters_present": [p_name],
+                "script": f"Medium shot of {p_name} stepping forward through the ruins with intense purpose, analyzing the environment.",
+                "image_prompt": f"Medium manga panel, {p_name} stepping forward with determination, hand resting on weapon, wind blowing hair, atmospheric shadow screentones",
+                "dialogue": [{"speaker_name": p_name, "text": "The signs are clear. We're running out of time.", "bubble_type": "speech", "x": 20.0, "y": 15.0}],
                 "narration": [],
-                "sound_effects": [{"text": "SHRRNG", "sfx_type": "dramatic", "x": 75.0, "y": 70.0, "size": "small"}]
+                "sound_effects": [{"text": "STEP", "sfx_type": "subtle", "x": 65.0, "y": 70.0, "size": "small"}]
             },
             {
+                "page_number": 1,
                 "panel_number": 3,
-                "script": "Close-up of protagonist's eyes filled with resolve.",
-                "image_prompt": "Extreme close-up manga panel, fierce determined eyes, detailed iris ink shading, dramatic speedlines background",
-                "dialogue": [{"speaker_name": "Hero", "text": "This blade remembers the ancient pledge.", "bubble_type": "thought", "x": 15.0, "y": 15.0}],
+                "camera_shot": "Low-angle Dutch tilt shot",
+                "characters_present": [r_name],
+                "script": f"Low-angle dynamic shot: An ominous presence emerges from the smoke as {r_name} arrives to block the path.",
+                "image_prompt": f"Dynamic low-angle tilted manga panel, shadowy rival emerging through thick swirling mist, weapon gleaming in moonlight, heavy shadow inking",
+                "dialogue": [{"speaker_name": r_name, "text": "Did you really believe you could pass unnoticed?", "bubble_type": "speech", "x": 25.0, "y": 16.0}],
                 "narration": [],
-                "sound_effects": []
+                "sound_effects": [{"text": "RUMBLE", "sfx_type": "dramatic", "x": 55.0, "y": 50.0, "size": "medium"}]
             },
             {
+                "page_number": 1,
                 "panel_number": 4,
-                "script": "Dynamic diagonal cut: The antagonist arrives in a burst of power.",
-                "image_prompt": "Action manga panel, armored antagonist crashing through barrier, diagonal dynamic angle, impact dust debris, bold ink linework",
-                "dialogue": [{"speaker_name": "Rival", "text": "You dare face me?!", "bubble_type": "shout", "x": 20.0, "y": 12.0}],
+                "camera_shot": "Extreme close-up shot",
+                "characters_present": [p_name],
+                "script": f"Page-turn cliffhanger: Extreme close-up of {p_name}'s eyes blazing with resolute determination.",
+                "image_prompt": f"Extreme close-up manga panel, {p_name}'s eyes burning with intense resolve, detailed iris shading, sweat and grit, dramatic speedlines radiating outward",
+                "dialogue": [{"speaker_name": p_name, "text": "I won't let you stand in my way!", "bubble_type": "shout", "x": 20.0, "y": 15.0}],
                 "narration": [],
-                "sound_effects": [{"text": "BASHHH!", "sfx_type": "impact", "x": 55.0, "y": 55.0, "size": "large"}]
+                "sound_effects": [{"text": "SHRRRNK", "sfx_type": "tension", "x": 75.0, "y": 45.0, "size": "medium"}]
             },
             {
+                "page_number": 2,
                 "panel_number": 5,
-                "script": "Over-the-shoulder shot — two figures face off at close range, tension crackling.",
-                "image_prompt": "Over-shoulder manga panel, tense face-off, two figures, crackling energy between them, heavy shadow screentone",
-                "dialogue": [{"speaker_name": "Hero", "text": "Then let's settle this here!", "bubble_type": "speech", "x": 55.0, "y": 20.0}],
+                "camera_shot": "Dynamic two-shot combat stance",
+                "characters_present": [p_name, r_name],
+                "script": f"Opening of Page 2: Wide-medium two-shot, {p_name} and {r_name} squaring off at close range, energy sparking between them.",
+                "image_prompt": f"Dynamic two-shot manga panel, two warriors facing each other in combat stances, crackling aura energy between them, fractured ground, dramatic cross-hatching",
+                "dialogue": [{"speaker_name": r_name, "text": "Then prove your conviction!", "bubble_type": "shout", "x": 20.0, "y": 15.0}],
                 "narration": [],
-                "sound_effects": [{"text": "BZZZZ", "sfx_type": "tension", "x": 48.0, "y": 50.0, "size": "medium"}]
+                "sound_effects": [{"text": "BZZZZT", "sfx_type": "tension", "x": 48.0, "y": 50.0, "size": "medium"}]
             },
             {
+                "page_number": 2,
                 "panel_number": 6,
-                "script": "CLIMAX SPLASH: Hero unleashes full power in a devastating strike.",
-                "image_prompt": "Epic climactic manga splash panel, hero unleashing maximum energy aura, speedlines radiating from center, explosive ink splatter, masterpiece manga art quality, Akira Toriyama power level",
-                "dialogue": [{"speaker_name": "Hero", "text": "ABSOLUTE LIMIT BREAK!", "bubble_type": "shout", "x": 55.0, "y": 15.0}],
+                "camera_shot": "Over-the-shoulder action angle",
+                "characters_present": [p_name],
+                "script": f"Over-the-shoulder angle: {p_name} channels inner power into a strike, energy swirling around the fist/blade.",
+                "image_prompt": f"Over-the-shoulder manga panel, {p_name} gathering radiant aura around weapon, dynamic foreshortening, glowing technique, high contrast inking",
+                "dialogue": [{"speaker_name": p_name, "text": "Take this!", "bubble_type": "shout", "x": 55.0, "y": 15.0}],
                 "narration": [],
-                "sound_effects": [{"text": "ZKKKKRAAAK!", "sfx_type": "impact", "x": 10.0, "y": 45.0, "size": "huge"}]
+                "sound_effects": [{"text": "VRRRRR", "sfx_type": "charge", "x": 30.0, "y": 60.0, "size": "large"}]
+            },
+            {
+                "page_number": 2,
+                "panel_number": 7,
+                "camera_shot": "Epic diagonal action splash",
+                "characters_present": [p_name, r_name],
+                "script": f"CLIMACTIC CLASH: Devastating strike collision, explosive impact sending shockwaves and shattered debris across the page.",
+                "image_prompt": f"Epic climactic diagonal action manga splash panel, explosive weapon strike collision, massive shockwave ripples, flying rock fragments, radiant speedlines, masterpiece manga art",
+                "dialogue": [],
+                "narration": [],
+                "sound_effects": [{"text": "BOOOOM!", "sfx_type": "impact", "x": 45.0, "y": 45.0, "size": "huge"}]
+            },
+            {
+                "page_number": 2,
+                "panel_number": 8,
+                "camera_shot": "Atmospheric aftermath shot",
+                "characters_present": [p_name],
+                "script": f"Chapter resolution: The smoke clears as {p_name} stands firm, looking toward the dawn with new resolve.",
+                "image_prompt": f"Atmospheric medium-wide manga panel, smoke clearing around {p_name} standing resolute, dawn light breaking through clouds, quiet aftermath, detailed manga screentone",
+                "dialogue": [{"speaker_name": p_name, "text": "This is only the first step.", "bubble_type": "thought", "x": 20.0, "y": 20.0}],
+                "narration": [{"text": "The trial was survived, but greater shadows lay ahead.", "box_type": "caption", "x": 6.0, "y": 75.0}],
+                "sound_effects": [{"text": "FWHHH", "sfx_type": "wind", "x": 75.0, "y": 25.0, "size": "small"}]
             }
         ]
 
@@ -259,9 +360,11 @@ async def art_generation_node(state: MangaWorkflowState) -> Dict[str, Any]:
     img_provider = get_image_provider()
 
     canonical_chars = state.get("canonical_characters", [])
-    char_desc_text = ""
-    for c in canonical_chars:
-        char_desc_text += f"{c.get('name')}: {c.get('appearance', '')}. "
+    char_fingerprints_map = {
+        c.get("name", "").strip().lower(): build_character_visual_fingerprint(c)
+        for c in canonical_chars
+        if c.get("name")
+    }
 
     panel_scripts = state.get("panel_scripts", [])
     generated_assets = []
@@ -309,29 +412,38 @@ async def art_generation_node(state: MangaWorkflowState) -> Dict[str, Any]:
             for d in panel.get("dialogue", [])
             if isinstance(d, dict) and d.get("speaker_name")
         ]
+        characters_present = [
+            str(cp).lower()
+            for cp in panel.get("characters_present", [])
+        ]
 
+        # Is this an environmental establishing shot where characters should NOT appear?
         is_establishing_landscape = (
-            p_num == 1 and
+            (p_num in (1, 5) or "establishing" in panel_text or "panoramic" in panel_text) and
             any(w in panel_text for w in ["wide", "panoramic", "establishing", "landscape", "sky", "horizon", "ruins", "exterior", "courtyard", "cityscape", "scenery", "ocean", "sea", "mountain"]) and
-            not dialogue_speakers
+            not dialogue_speakers and
+            not any(c_name in panel_text for c_name in char_fingerprints_map.keys())
         )
 
         panel_char_desc = ""
         if not is_establishing_landscape:
-            matched_chars = []
+            matched_fingerprints = []
             for c in canonical_chars:
                 c_name = c.get("name", "").strip()
                 c_name_lower = c_name.lower()
-                if (
+                is_present = (
                     c_name_lower in panel_text or
                     any(c_name_lower in spk for spk in dialogue_speakers) or
-                    (not matched_chars and c.get("role", "").lower() in ("protagonist", "lead"))
-                ):
-                    clean_app = c.get("appearance", "").strip()
-                    if clean_app:
-                        matched_chars.append(f"{c_name}: {clean_app[:150]}")
-            if matched_chars:
-                panel_char_desc = "; ".join(matched_chars[:2])
+                    any(c_name_lower in cp for cp in characters_present) or
+                    (not matched_fingerprints and c.get("role", "").lower() in ("protagonist", "lead"))
+                )
+                if is_present:
+                    fp = char_fingerprints_map.get(c_name_lower) or build_character_visual_fingerprint(c)
+                    if fp and fp not in matched_fingerprints:
+                        matched_fingerprints.append(fp)
+
+            if matched_fingerprints:
+                panel_char_desc = "; ".join(matched_fingerprints[:2])
 
         logger.info(f"Generating artwork for panel {p_num}/{total_panels}")
         res = await img_provider.generate_image(
@@ -348,7 +460,7 @@ async def art_generation_node(state: MangaWorkflowState) -> Dict[str, Any]:
             res = await MockImageProvider().generate_image(
                 prompt=prompt,
                 art_style=state.get("art_style", "Traditional Manga B&W"),
-                canonical_descriptions=char_desc_text,
+                canonical_descriptions=panel_char_desc,
                 genre=state.get("genre", "")
             )
 

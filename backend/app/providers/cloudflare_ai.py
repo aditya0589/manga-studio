@@ -29,33 +29,26 @@ class CloudflareAIProvider(BaseImageProvider):
     # Manga-specialist style blueprints
     _STYLE_MAP = {
         "bw": (
-            "masterpiece traditional Japanese manga panel, "
-            "crisp bold ink linework, heavy black shadows, "
-            "detailed screentone dot patterns, dynamic cross-hatching, "
-            "high contrast monochrome, Kentaro Miura Berserk art quality, "
-            "Takehiko Inoue Vagabond ink style, "
-            "dramatic cinematic composition, expressive character faces, "
-            "professional manga illustration"
+            "traditional Japanese manga panel, crisp bold ink linework, "
+            "detailed screentone shading, high contrast monochrome, "
+            "dramatic cinematic lighting"
         ),
         "dark_fantasy": (
-            "masterpiece dark manga panel, Berserk art style, "
-            "heavy inking chiaroscuro, deep shadow hatching, "
-            "grim horror fantasy atmosphere, intricate armor weapon details"
+            "dark fantasy manga panel, Berserk aesthetic, "
+            "heavy chiaroscuro ink cross-hatching, deep shadows, "
+            "grim dramatic atmosphere"
         ),
         "cyberpunk": (
-            "masterpiece cyberpunk manga, Ghost in the Shell aesthetic, "
-            "neo-tokyo neon cityscape, intricate tech linework, "
-            "detailed mech designs, sharp manga inking"
+            "cyberpunk manga panel, Ghost in the Shell aesthetic, "
+            "intricate tech linework, neo-tokyo atmosphere, sharp manga inking"
         ),
         "shonen": (
-            "masterpiece shonen manga panel, explosive action pose, "
-            "speed lines motion blur, bold manga inking, "
-            "energy auras screentone, Dragon Ball Z power level"
+            "dynamic shonen manga panel, bold ink lines, "
+            "dramatic speedlines, explosive high-energy composition"
         ),
         "anime_color": (
-            "masterpiece anime illustration, vibrant saturated colors, "
-            "detailed cel shading, soft ambient occlusion, "
-            "Makoto Shinkai lighting, sharp clean anime lineart"
+            "vibrant anime comic illustration, detailed cel shading, "
+            "clean anime lineart, atmospheric lighting"
         ),
     }
 
@@ -86,15 +79,20 @@ class CloudflareAIProvider(BaseImageProvider):
         style_key = self._detect_style_key(art_style)
         style_tags = self._STYLE_MAP[style_key]
 
-        char_tag = ""
-        if canonical_descriptions:
-            char_tag = f"Character design: {canonical_descriptions.strip()[:250]}. "
+        # 1. Dynamic Shot angle, composition, action, and setting FIRST
+        clean_prompt = prompt.strip().rstrip(".")
 
+        # 2. Character visual anchors (if characters are present in this panel)
+        char_tag = ""
+        if canonical_descriptions and canonical_descriptions.strip():
+            char_tag = f"Featuring {canonical_descriptions.strip().rstrip('.')}. "
+
+        # 3. Assemble: [Cinematography & Action] -> [Character Consistency Anchors] -> [Art Style & Medium Guidance]
         full = (
-            f"{style_tags}. "
+            f"{clean_prompt}. "
             f"{char_tag}"
-            f"Scene: {prompt.strip()[:400]}. "
-            f"No text, no speech bubbles, no watermarks."
+            f"Style: {style_tags}, professional manga illustration, "
+            f"no text, no speech bubbles, no dialogue boxes, no watermark."
         )
         return full
 
@@ -131,7 +129,10 @@ class CloudflareAIProvider(BaseImageProvider):
         # only 'prompt', 'steps' (max 8), and 'image' are permitted
         if "flux" in self.model.lower():
             # Include negative guidance in prompt context for Flux prompt-steering
-            flux_prompt = f"{full_prompt}. Style guidance: pure manga illustration, clean ink lines, no photorealism, no 3d render, no text, no speech bubbles."
+            flux_prompt = (
+                f"{full_prompt}. "
+                f"Negative guidance: photorealistic, 3d render, western cartoon, blurry, deformed anatomy, dialogue bubbles."
+            )
             payload = {
                 "prompt": flux_prompt,
                 "steps": 6,

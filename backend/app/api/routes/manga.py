@@ -181,16 +181,57 @@ async def create_page(
     db.add(new_page)
     await db.flush()
 
-    # Pre-populate 4 empty panels
-    for i in range(1, 5):
+    # Fetch project characters to contextualize new panels
+    char_res = await db.execute(select(Character).where(Character.project_id == project.id))
+    chars = char_res.scalars().all()
+    p_name = next((c.name for c in chars if c.role and c.role.lower() in ("protagonist", "lead")), (chars[0].name if chars else "Hero"))
+    r_name = next((c.name for c in chars if c.role and c.role.lower() in ("antagonist", "rival", "supporting") and c.name != p_name), "Rival")
+
+    # Pre-populate 4 distinct progressive panels for this page
+    panels_blueprint = [
+        {
+            "panel_number": 1,
+            "script": f"Page {next_page_num} establishing transition: Wide atmospheric shot setting the new dramatic scene.",
+            "image_prompt": f"Wide panoramic manga establishing shot, {project.title} setting, dramatic sky and lighting, high contrast ink lineart, screentones",
+            "dialogue": [],
+            "narration": [{"text": f"The story advances into uncharted territory.", "box_type": "caption", "x": 6.0, "y": 6.0}],
+            "sound_effects": [{"text": "WHOOSH", "sfx_type": "ambient", "x": 70.0, "y": 15.0, "size": "medium"}]
+        },
+        {
+            "panel_number": 2,
+            "script": f"Medium character action: {p_name} advances with determined expression, analyzing the situation.",
+            "image_prompt": f"Medium manga action panel, {p_name} advancing with focused determination, weapon ready, dynamic pose, screentone shading",
+            "dialogue": [{"speaker_name": p_name, "text": "We have to stay alert and keep moving.", "bubble_type": "speech", "x": 20.0, "y": 15.0}],
+            "narration": [],
+            "sound_effects": [{"text": "STEP", "sfx_type": "subtle", "x": 65.0, "y": 65.0, "size": "small"}]
+        },
+        {
+            "panel_number": 3,
+            "script": f"Dramatic tension: Low-angle or Dutch tilt shot of unexpected confrontation with {r_name}.",
+            "image_prompt": f"Dynamic low-angle tilted manga panel, tense confrontation, shadows deepening, high contrast chiaroscuro inking",
+            "dialogue": [{"speaker_name": r_name, "text": "You won't escape so easily!", "bubble_type": "shout", "x": 25.0, "y": 16.0}],
+            "narration": [],
+            "sound_effects": [{"text": "RUMBLE", "sfx_type": "tension", "x": 55.0, "y": 50.0, "size": "medium"}]
+        },
+        {
+            "panel_number": 4,
+            "script": f"Page climax / turning point: High-intensity strike or cliffhanger reaction shot.",
+            "image_prompt": f"Epic climactic diagonal manga action panel, explosive power release, dynamic speedlines, dramatic impact debris, masterpiece art",
+            "dialogue": [{"speaker_name": p_name, "text": "Then witness my full resolve!", "bubble_type": "shout", "x": 55.0, "y": 15.0}],
+            "narration": [],
+            "sound_effects": [{"text": "ZKKRAAAK!", "sfx_type": "impact", "x": 10.0, "y": 45.0, "size": "large"}]
+        }
+    ]
+
+    for p_data in panels_blueprint:
         panel = Panel(
             page_id=new_page.id,
-            panel_number=i,
-            script=f"Panel {i} description",
-            image_prompt="High contrast manga panel art, ink lineart, screentones",
-            dialogue=[],
-            narration=[],
-            sound_effects=[],
+            panel_number=p_data["panel_number"],
+            script=p_data["script"],
+            image_prompt=p_data["image_prompt"],
+            dialogue=p_data["dialogue"],
+            narration=p_data["narration"],
+            sound_effects=p_data["sound_effects"],
             layout_config={},
             status="pending"
         )
@@ -303,13 +344,49 @@ async def generate_panel_artwork(
     panel.status = "generating"
     await db.commit()
 
-    # Retrieve canonical character descriptions for consistency
-    char_desc = ""
+    # Retrieve canonical characters and match only relevant characters for THIS panel
+    from app.agents.manga_agents import build_character_visual_fingerprint
+
     char_res = await db.execute(select(Character).where(Character.project_id == project.id))
-    for c in char_res.scalars().all():
-        char_desc += f"{c.name}: {c.appearance}. "
+    all_chars = char_res.scalars().all()
 
     prompt_to_use = (payload.custom_prompt if payload and payload.custom_prompt else None) or panel.image_prompt or panel.script or "Dynamic manga action scene"
+
+    panel_text = (str(prompt_to_use) + " " + str(panel.script or "")).lower()
+    dialogue_speakers = [
+        str(d.get("speaker_name", "")).lower()
+        for d in (panel.dialogue or [])
+        if isinstance(d, dict) and d.get("speaker_name")
+    ]
+
+    is_establishing_landscape = (
+        (panel.panel_number in (1, 5) or "establishing" in panel_text or "panoramic" in panel_text) and
+        any(w in panel_text for w in ["wide", "panoramic", "establishing", "landscape", "sky", "horizon", "ruins", "exterior", "courtyard", "cityscape", "scenery", "ocean", "sea", "mountain"]) and
+        not dialogue_speakers and
+        not any(c.name.lower() in panel_text for c in all_chars)
+    )
+
+    matched_fingerprints = []
+    if not is_establishing_landscape:
+        for c in all_chars:
+            c_name_lower = c.name.lower()
+            is_present = (
+                c_name_lower in panel_text or
+                any(c_name_lower in spk for spk in dialogue_speakers) or
+                (not matched_fingerprints and c.role and c.role.lower() in ("protagonist", "lead"))
+            )
+            if is_present:
+                char_dict = {
+                    "name": c.name,
+                    "role": c.role,
+                    "appearance": c.appearance,
+                    "canon_data": c.canon_data
+                }
+                fp = build_character_visual_fingerprint(char_dict)
+                if fp and fp not in matched_fingerprints:
+                    matched_fingerprints.append(fp)
+
+    char_desc = "; ".join(matched_fingerprints[:2]) if matched_fingerprints else None
 
     img_provider = get_image_provider()
     result = await img_provider.generate_image(
