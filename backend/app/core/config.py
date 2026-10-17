@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     CLOUDFLARE_ACCOUNT_ID: Optional[str] = None
     CLOUDFLARE_API_TOKEN: Optional[str] = None
     CLOUDFLARE_IMAGE_MODEL: str = "@cf/black-forest-labs/flux-1-schnell"
+    CLOUDFLARE_LLM_MODEL: str = "@cf/meta/llama-3.1-8b-instruct"
 
     # Storage
     STORAGE_BACKEND: str = "local"
@@ -69,7 +70,10 @@ class Settings(BaseSettings):
 
     @property
     def is_llm_configured(self) -> bool:
-        return bool(self.OPENROUTER_API_KEY and self.OPENROUTER_API_KEY.strip())
+        return bool(
+            (self.OPENROUTER_API_KEY and self.OPENROUTER_API_KEY.strip()) or
+            (self.CLOUDFLARE_ACCOUNT_ID and self.CLOUDFLARE_ACCOUNT_ID.strip() and self.CLOUDFLARE_API_TOKEN and self.CLOUDFLARE_API_TOKEN.strip())
+        )
 
     @property
     def is_image_provider_configured(self) -> bool:

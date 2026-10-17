@@ -1,6 +1,8 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.database import get_db
 from app.models.user import User
@@ -11,6 +13,31 @@ from app.api.dependencies import get_current_user
 from app.workers.job_manager import job_manager
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
+
+@router.get("/project/{project_id}/active", response_model=Optional[JobResponse])
+async def get_active_project_job(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    project = await db.get(Project, project_id)
+    if not project or project.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    stmt = (
+        select(GenerationJob)
+        .where(
+            GenerationJob.project_id == project_id,
+            GenerationJob.status.in_(["queued", "running", "planning"])
+        )
+        .order_by(GenerationJob.created_at.desc())
+        .limit(1)
+    )
+    res = await db.execute(stmt)
+    job = res.scalar_one_or_none()
+    if not job:
+        return None
+    return JobResponse.model_validate(job)
 
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job_status(

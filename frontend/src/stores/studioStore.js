@@ -16,8 +16,10 @@ export const useStudioStore = create((set, get) => ({
   setAutosaveStatus: (status) => set({ autosaveStatus: status }),
 
   setCurrentJob: (job) => set({ currentJob: job }),
-  updateJobProgress: (progress, stage) => set((state) => ({
-    currentJob: state.currentJob ? { ...state.currentJob, progress, stage } : { progress, stage }
+  updateJobProgress: (progress, stage, extra = {}) => set((state) => ({
+    currentJob: state.currentJob 
+      ? { ...state.currentJob, progress, stage, ...extra } 
+      : { progress, stage, status: 'running', ...extra }
   })),
 
   addNotification: (message, type = 'info') => {

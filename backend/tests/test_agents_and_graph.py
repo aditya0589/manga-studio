@@ -77,3 +77,13 @@ async def test_langgraph_full_workflow_execution():
     assert len(final_state["panel_scripts"]) > 0
     assert len(final_state["pages"]) > 0
     assert len(final_state["generated_assets"]) > 0
+
+@pytest.mark.asyncio
+async def test_free_flux_provider_fallback():
+    from app.providers.free_flux_provider import FreeFluxImageProvider
+    provider = FreeFluxImageProvider()
+    res = await provider.generate_image("A samurai confronting his nemesis on a stormy cliff")
+    assert res["success"] is True
+    assert res["image_bytes"] is not None
+    assert len(res["image_bytes"]) > 1000
+    assert res["mime_type"] == "image/jpeg"

@@ -126,13 +126,24 @@ class CloudflareAIProvider(BaseImageProvider):
             "Authorization": f"Bearer {self.api_token}",
             "Content-Type": "application/json"
         }
-        payload = {
-            "prompt": full_prompt,
-            "negative_prompt": neg,
-            "num_steps": 8,  # 8 steps → significantly better manga detail vs default 4
-            "width": width,
-            "height": height,
-        }
+        
+        # Flux models on Cloudflare AI strictly enforce JSON schema:
+        # only 'prompt', 'steps' (max 8), and 'image' are permitted
+        if "flux" in self.model.lower():
+            # Include negative guidance in prompt context for Flux prompt-steering
+            flux_prompt = f"{full_prompt}. Style guidance: pure manga illustration, clean ink lines, no photorealism, no 3d render, no text, no speech bubbles."
+            payload = {
+                "prompt": flux_prompt,
+                "steps": 6,
+            }
+        else:
+            payload = {
+                "prompt": full_prompt,
+                "negative_prompt": neg,
+                "num_steps": 8,
+                "width": width,
+                "height": height,
+            }
 
         last_error = None
         async with httpx.AsyncClient() as client:

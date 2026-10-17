@@ -21,6 +21,24 @@ from app.api.dependencies import get_current_user
 from app.providers import get_image_provider
 from app.storage import storage, compute_checksum
 
+def clean_panel_dialogue(dialogue_list):
+    if not dialogue_list:
+        return []
+    cleaned = []
+    for d in dialogue_list:
+        if isinstance(d, dict):
+            d_copy = dict(d)
+            spk = str(d_copy.get("speaker_name", "Character")).strip()
+            if ":" in spk:
+                spk = spk.split(":", 1)[0].strip()
+            if "(" in spk:
+                spk = spk.split("(", 1)[0].strip()
+            d_copy["speaker_name"] = spk or "Character"
+            cleaned.append(d_copy)
+        else:
+            cleaned.append(d)
+    return cleaned
+
 router = APIRouter(tags=["Manga Editor"])
 
 @router.get("/chapters/{chapter_id}/pages", response_model=List[PageResponse])
@@ -60,7 +78,7 @@ async def get_chapter_pages(
                 panel_number=p.panel_number,
                 script=p.script,
                 image_prompt=p.image_prompt,
-                dialogue=p.dialogue or [],
+                dialogue=clean_panel_dialogue(p.dialogue),
                 narration=p.narration or [],
                 sound_effects=p.sound_effects or [],
                 layout_config=p.layout_config or {},
@@ -114,7 +132,7 @@ async def get_project_pages(
                 panel_number=p.panel_number,
                 script=p.script,
                 image_prompt=p.image_prompt,
-                dialogue=p.dialogue or [],
+                dialogue=clean_panel_dialogue(p.dialogue),
                 narration=p.narration or [],
                 sound_effects=p.sound_effects or [],
                 layout_config=p.layout_config or {},
@@ -202,7 +220,7 @@ async def create_page(
             panel_number=p.panel_number,
             script=p.script,
             image_prompt=p.image_prompt,
-            dialogue=p.dialogue or [],
+            dialogue=clean_panel_dialogue(p.dialogue),
             narration=p.narration or [],
             sound_effects=p.sound_effects or [],
             layout_config=p.layout_config or {},
@@ -233,6 +251,8 @@ async def update_panel(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     data = payload.model_dump(exclude_unset=True)
+    if "dialogue" in data:
+        data["dialogue"] = clean_panel_dialogue(data["dialogue"])
     for field, val in data.items():
         setattr(panel, field, val)
 
@@ -250,7 +270,7 @@ async def update_panel(
         panel_number=panel.panel_number,
         script=panel.script,
         image_prompt=panel.image_prompt,
-        dialogue=panel.dialogue or [],
+        dialogue=clean_panel_dialogue(panel.dialogue),
         narration=panel.narration or [],
         sound_effects=panel.sound_effects or [],
         layout_config=panel.layout_config or {},
@@ -295,8 +315,22 @@ async def generate_panel_artwork(
     result = await img_provider.generate_image(
         prompt=prompt_to_use,
         art_style=project.art_style,
-        canonical_descriptions=char_desc
+        canonical_descriptions=char_desc,
+        genre=project.genre or ""
     )
+
+    if not result.get("success") or not result.get("image_bytes"):
+        logger.warning(
+            f"Primary image generation failed for panel {panel.panel_number}: {result.get('error')}. "
+            "Using Studio Manga Engine fallback."
+        )
+        from app.providers.mock_provider import MockImageProvider
+        result = await MockImageProvider().generate_image(
+            prompt=prompt_to_use,
+            art_style=project.art_style,
+            canonical_descriptions=char_desc,
+            genre=project.genre or ""
+        )
 
     if not result.get("success") or not result.get("image_bytes"):
         panel.status = "error"

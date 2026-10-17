@@ -225,7 +225,8 @@ class MangaPDFExporter:
                 for d in panel.get("dialogue", []):
                     rel_x = px + (d.get("x", 20.0) / 100.0) * col_w
                     rel_y = py + (d.get("y", 20.0) / 100.0) * row_h
-                    self._draw_speech_bubble(c, d.get("text", ""), d.get("speaker_name", "Character"), rel_x, rel_y, d.get("bubble_type", "speech"))
+                    raw_spk = str(d.get("speaker_name", "Character")).split(":")[0].split("(")[0].strip() or "Character"
+                    self._draw_speech_bubble(c, d.get("text", ""), raw_spk, rel_x, rel_y, d.get("bubble_type", "speech"))
 
                 for n in panel.get("narration", []):
                     rel_x = px + (n.get("x", 10.0) / 100.0) * col_w

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../api/projects';
 import { mangaApi } from '../../api/manga';
+import { jobsApi } from '../../api/jobs';
 import { useStudioStore } from '../../stores/studioStore';
+import { useSSE } from '../../hooks/useSSE';
 import { 
   Palette, 
   Layers, 
@@ -19,14 +21,27 @@ import {
   Compass, 
   Volume2, 
   BookMarked,
-  Sliders
+  Sliders,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
+
+const formatSpeakerName = (name) => {
+  if (!name) return 'Character';
+  let clean = String(name).trim();
+  if (clean.includes(':')) clean = clean.split(':')[0].trim();
+  if (clean.includes('(')) clean = clean.split('(')[0].trim();
+  return clean || 'Character';
+};
 
 export default function MangaEditor() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { addNotification, autosaveStatus, setAutosaveStatus } = useStudioStore();
+  const { currentJob, setCurrentJob, addNotification, autosaveStatus, setAutosaveStatus } = useStudioStore();
+
+  const urlJobId = searchParams.get('job_id');
 
   const [selectedPanelId, setSelectedPanelId] = useState(null);
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
@@ -48,11 +63,38 @@ export default function MangaEditor() {
     enabled: !!projectId,
   });
 
+  // Query for any active running job for this project
+  const { data: activeJob } = useQuery({
+    queryKey: ['activeProjectJob', projectId],
+    queryFn: () => jobsApi.getActiveProjectJob(projectId),
+    enabled: !!projectId && (!currentJob || currentJob.status !== 'running'),
+    refetchInterval: (query) => (query.state.data?.status === 'running' ? 2500 : false),
+  });
+
+  useEffect(() => {
+    if (activeJob && (!currentJob || currentJob.id !== activeJob.id)) {
+      setCurrentJob({
+        id: activeJob.id,
+        progress: activeJob.progress || 10,
+        stage: activeJob.current_stage || 'Synthesizing manga artwork...',
+        status: activeJob.status
+      });
+    }
+  }, [activeJob, currentJob, setCurrentJob]);
+
+  // Connect SSE for active job
+  const activeJobId = urlJobId || (currentJob?.status === 'running' ? currentJob?.id : null) || (activeJob?.status === 'running' ? activeJob?.id : null);
+  useSSE(activeJobId, () => {
+    queryClient.invalidateQueries({ queryKey: ['mangaPages', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['activeProjectJob', projectId] });
+  });
+
   // Fetch first chapter for the project (or create if needed)
   const { data: pages = [], isLoading: isPagesLoading } = useQuery({
     queryKey: ['mangaPages', projectId],
     queryFn: () => mangaApi.getProjectPages(projectId),
     enabled: !!projectId,
+    refetchInterval: currentJob?.status === 'running' ? 3000 : false,
   });
 
   const currentPage = pages[currentPageIdx] || null;
@@ -65,7 +107,7 @@ export default function MangaEditor() {
       setImagePrompt(selectedPanel.image_prompt || '');
       if (selectedPanel.dialogue && selectedPanel.dialogue.length > 0) {
         setDialogueText(selectedPanel.dialogue[0].text || '');
-        setSpeakerName(selectedPanel.dialogue[0].speaker_name || 'Character');
+        setSpeakerName(formatSpeakerName(selectedPanel.dialogue[0].speaker_name));
         setBubbleType(selectedPanel.dialogue[0].bubble_type || 'speech');
       } else {
         setDialogueText('');
@@ -133,14 +175,12 @@ export default function MangaEditor() {
         addNotification(`Panel ${p.panel_number} generated!`, 'success');
 
         if (i < currentPanels.length - 1) {
-          for (let sec = 46; sec > 0; sec--) {
-            setBatchProgress({
-              current: i + 1,
-              total: currentPanels.length,
-              status: `Free tier cooldown: ready in ${sec}s...`
-            });
-            await new Promise((res) => setTimeout(res, 1000));
-          }
+          setBatchProgress({
+            current: i + 1,
+            total: currentPanels.length,
+            status: `Preparing panel ${currentPanels[i + 1]?.panel_number || (i + 2)}...`
+          });
+          await new Promise((res) => setTimeout(res, 500));
         }
       }
       addNotification('All page panels generated successfully!', 'success');
@@ -263,22 +303,122 @@ export default function MangaEditor() {
         </div>
       </div>
 
-      {isPagesLoading ? (
-        <div className="py-24 text-center text-xs text-slate-500">Loading page layout...</div>
-      ) : pages.length === 0 ? (
-        <div className="py-20 text-center rounded-2xl border border-dashed border-[#242938] max-w-lg mx-auto">
-          <Palette className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-white mb-1">No Manga Pages Assembled</h3>
-          <p className="text-xs text-slate-400 mb-4">
-            Generate Chapter 1 from the Story Bible workspace to launch the Manga Director and Art Generation agents.
-          </p>
-          <button
-            onClick={() => navigate(`/projects/${projectId}`)}
-            className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs transition-all"
-          >
-            Go to Story Bible
-          </button>
+      {/* Live Agent Progress Banner */}
+      {currentJob && currentJob.status === 'running' && (
+        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-violet-950/80 via-[#181b2a] to-indigo-950/80 border border-violet-500/40 shadow-xl shadow-violet-950/40 transition-all">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-violet-500"></span>
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-violet-300 bg-violet-900/60 px-2.5 py-0.5 rounded-full border border-violet-700/50 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  Live AI Agent
+                </span>
+                <span className="text-sm font-semibold text-white">
+                  {currentJob.stage || 'Synthesizing manga artwork...'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-violet-300 shrink-0">
+              <span>{currentJob.progress || 10}% Complete</span>
+            </div>
+          </div>
+
+          {/* Dynamic Progress Bar */}
+          <div className="w-full h-2 bg-slate-900/80 rounded-full overflow-hidden border border-violet-900/40 mb-3">
+            <div 
+              className="h-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-indigo-400 transition-all duration-500 ease-out"
+              style={{ width: `${Math.max(currentJob.progress || 10, 5)}%` }}
+            />
+          </div>
+
+          {/* Live Panel Chips Tracker */}
+          {currentJob.total_panels > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-violet-900/30">
+              <span className="text-[11px] font-medium text-slate-400 mr-1">Panels Progress:</span>
+              {Array.from({ length: currentJob.total_panels }, (_, idx) => {
+                const pNum = idx + 1;
+                const isDone = (currentJob.completed_panels || 0) >= pNum;
+                const isCurrent = currentJob.current_panel === pNum && !isDone;
+                
+                if (isDone) {
+                  return (
+                    <span key={pNum} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-950/70 border border-emerald-800/50 text-emerald-300">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      Panel {pNum}
+                    </span>
+                  );
+                }
+                if (isCurrent) {
+                  return (
+                    <span key={pNum} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-violet-600/30 border border-violet-500 text-violet-200 animate-pulse shadow-sm shadow-violet-500/50">
+                      <Loader2 className="w-3 h-3 animate-spin text-violet-400" />
+                      Panel {pNum} (Generating)
+                    </span>
+                  );
+                }
+                return (
+                  <span key={pNum} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-900/50 border border-slate-800 text-slate-500">
+                    <Clock className="w-3 h-3 text-slate-600" />
+                    Panel {pNum}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
+      )}
+
+      {isPagesLoading ? (
+        <div className="py-24 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2">
+          <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+          <span>Loading page layout...</span>
+        </div>
+      ) : pages.length === 0 ? (
+        currentJob && currentJob.status === 'running' ? (
+          <div className="py-20 text-center rounded-2xl border border-violet-800/40 bg-gradient-to-b from-[#151726] to-[#0e1019] max-w-lg mx-auto p-8 shadow-2xl">
+            <div className="relative w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <span className="absolute inset-0 rounded-2xl bg-violet-600/20 animate-ping"></span>
+              <div className="relative w-14 h-14 rounded-2xl bg-violet-950 border border-violet-700/60 flex items-center justify-center text-violet-300 shadow-lg">
+                <Sparkles className="w-7 h-7 text-amber-300 animate-pulse" />
+              </div>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Manga Chapter In Production</h3>
+            <p className="text-xs text-slate-300 mb-6 leading-relaxed">
+              {currentJob.stage || 'The 9-agent LangGraph pipeline is directing panels, drafting dialogue, and synthesizing artwork.'}
+            </p>
+            <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-violet-900/40 mb-3">
+              <div 
+                className="h-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-indigo-400 transition-all duration-500"
+                style={{ width: `${Math.max(currentJob.progress || 10, 5)}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <span>Status: Active Pipeline</span>
+              <span className="font-bold text-violet-300">{currentJob.progress || 10}%</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-4 italic">
+              Pages will automatically render onto the canvas as panels are finished.
+            </p>
+          </div>
+        ) : (
+          <div className="py-20 text-center rounded-2xl border border-dashed border-[#242938] max-w-lg mx-auto p-6">
+            <Palette className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+            <h3 className="text-base font-bold text-white mb-1">No Manga Pages Assembled</h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Generate Chapter 1 from the Story Bible workspace to launch the Manga Director and Art Generation agents.
+            </p>
+            <button
+              onClick={() => navigate(`/projects/${projectId}`)}
+              className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs transition-all"
+            >
+              Go to Story Bible
+            </button>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Center Column: Large Manga Page Canvas (8 cols) */}
@@ -357,7 +497,7 @@ export default function MangaEditor() {
                         {panel.dialogue && panel.dialogue.length > 0 ? (
                           <div className={panel.dialogue[0].bubble_type === 'thought' ? 'thought-bubble' : 'speech-bubble'}>
                             <p className="text-[9px] uppercase tracking-wider text-purple-700 font-bold mb-0.5">
-                              {panel.dialogue[0].speaker_name}
+                              {formatSpeakerName(panel.dialogue[0].speaker_name)}
                             </p>
                             <p className="text-xs">{panel.dialogue[0].text}</p>
                           </div>

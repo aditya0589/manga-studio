@@ -34,7 +34,11 @@ class MockLLMProvider(BaseLLMProvider):
             clean_names = re.findall(r"['\"]([^'\"]+)['\"]", char_str)
             if not clean_names:
                 clean_names = [n.strip() for n in char_str.strip("[]").split(",") if n.strip()]
-            found_chars = [n for n in clean_names if n.lower() not in ("none", "null")]
+            for n in clean_names:
+                # Strip off any colon, parentheses or descriptions like "Kenji: Protagonist..."
+                raw_name = n.split(":")[0].split("(")[0].strip()
+                if raw_name and raw_name.lower() not in ("none", "null"):
+                    found_chars.append(raw_name)
 
         # Determine Theme
         combined_text = (prompt_lower + " " + title.lower())
@@ -339,32 +343,32 @@ class MockLLMProvider(BaseLLMProvider):
                     "panel_scripts": [
                         {
                             "panel_number": 1,
-                            "script": "Wide establishing shot of the moonlit battleground under stormy skies.",
-                            "image_prompt": f"Wide dramatic manga panel, stormy moonlit sky over ruined landscape, high contrast ink lineart, crisp screentones",
+                            "script": f"Wide establishing shot setting the world of {title}.",
+                            "image_prompt": f"Wide panoramic manga establishing shot, {title} environment under dramatic sky, high contrast ink lineart, crisp screentones",
                             "dialogue": [],
-                            "narration": [{"text": "Midnight in the Outer Ruins.", "box_type": "caption", "x": 6.0, "y": 6.0}],
-                            "sound_effects": [{"text": "ROOOAAAR", "sfx_type": "ambient", "x": 65.0, "y": 20.0, "size": "large"}]
+                            "narration": [{"text": f"The story unfolds in {title}.", "box_type": "caption", "x": 6.0, "y": 6.0}],
+                            "sound_effects": [{"text": "WHOOOSH", "sfx_type": "ambient", "x": 65.0, "y": 20.0, "size": "large"}]
                         },
                         {
                             "panel_number": 2,
-                            "script": f"Close-up on {p}'s eyes glowing with fierce determination.",
-                            "image_prompt": f"Intense close-up manga panel of {p}'s eyes, fierce determination, {ctx['protagonist_desc']}, screentone shading",
-                            "dialogue": [{"speaker_name": p, "text": "I will protect this future with my life.", "bubble_type": "speech", "x": 20.0, "y": 15.0}],
+                            "script": f"Inciting moment: {p} steps forward, analyzing the surroundings.",
+                            "image_prompt": f"Medium manga panel, {p} stepping forward with determination, detailed hair and outfit, screentone shading",
+                            "dialogue": [{"speaker_name": p, "text": "Something isn't right here. We need to stay alert.", "bubble_type": "speech", "x": 20.0, "y": 15.0}],
                             "narration": [],
                             "sound_effects": [{"text": "THUMP", "sfx_type": "dramatic", "x": 70.0, "y": 65.0, "size": "medium"}]
                         },
                         {
                             "panel_number": 3,
-                            "script": "Action panel: Heavy enforcer smashing forward with club.",
-                            "image_prompt": "Action manga panel, heavily armored warrior smashing forward, splintering debris, dynamic diagonal angle",
-                            "dialogue": [{"speaker_name": "Enforcer", "text": "Found you!", "bubble_type": "shout", "x": 25.0, "y": 18.0}],
+                            "script": f"Rising confrontation: An unexpected rival ambushes from the mist.",
+                            "image_prompt": f"Action manga panel, opposing warrior striking forward through smoke, dynamic diagonal angle, impact debris",
+                            "dialogue": [{"speaker_name": "Rival", "text": "Your search ends here!", "bubble_type": "shout", "x": 25.0, "y": 18.0}],
                             "narration": [],
                             "sound_effects": [{"text": "BASHHH!", "sfx_type": "impact", "x": 50.0, "y": 50.0, "size": "large"}]
                         },
                         {
                             "panel_number": 4,
-                            "script": f"Climactic splash panel: {p} unleashes explosive spiritual energy strike.",
-                            "image_prompt": f"Epic climactic manga splash panel, {p} swinging blade with explosive celestial aura, high contrast speedlines, ink splatter, masterpiece manga art",
+                            "script": f"Climactic clash: {p} unleashes their signature power to turn the tide.",
+                            "image_prompt": f"Epic climactic manga splash panel, {p} unleashing full power strike, radiating celestial aura, speedlines, masterpiece art",
                             "dialogue": [{"speaker_name": p, "text": "SPIRIT BLADE, STRIKE!", "bubble_type": "shout", "x": 60.0, "y": 20.0}],
                             "narration": [],
                             "sound_effects": [{"text": "ZKKKKKK!", "sfx_type": "impact", "x": 15.0, "y": 40.0, "size": "huge"}]

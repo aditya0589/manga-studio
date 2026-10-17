@@ -3,15 +3,20 @@ from app.providers.llm_base import BaseLLMProvider
 from app.providers.image_base import BaseImageProvider
 from app.providers.openrouter import OpenRouterProvider
 from app.providers.cloudflare_ai import CloudflareAIProvider
+from app.providers.cloudflare_llm import CloudflareLLMProvider
 from app.providers.free_flux_provider import FreeFluxImageProvider
 from app.providers.mock_provider import MockLLMProvider, MockImageProvider
 
 import os
 
 def get_llm_provider(force_mock: bool = False) -> BaseLLMProvider:
-    if force_mock or os.getenv("TESTING") == "1" or not settings.is_llm_configured:
+    if force_mock or os.getenv("TESTING") == "1":
         return MockLLMProvider()
-    return OpenRouterProvider()
+    if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY.strip():
+        return OpenRouterProvider()
+    if settings.is_image_provider_configured:
+        return CloudflareLLMProvider()
+    return MockLLMProvider()
 
 def get_image_provider(force_mock: bool = False) -> BaseImageProvider:
     if force_mock or os.getenv("TESTING") == "1":

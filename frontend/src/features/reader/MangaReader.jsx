@@ -17,6 +17,14 @@ import {
   FileDown
 } from 'lucide-react';
 
+const formatSpeakerName = (name) => {
+  if (!name) return 'Character';
+  let clean = String(name).trim();
+  if (clean.includes(':')) clean = clean.split(':')[0].trim();
+  if (clean.includes('(')) clean = clean.split('(')[0].trim();
+  return clean || 'Character';
+};
+
 export default function MangaReader() {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -190,7 +198,7 @@ export default function MangaReader() {
                     {panel.dialogue && panel.dialogue.length > 0 && (
                       <div className={panel.dialogue[0].bubble_type === 'thought' ? 'thought-bubble text-[11px]' : 'speech-bubble text-[11px]'}>
                         <p className="text-[9px] uppercase tracking-wider text-purple-700 font-bold mb-0.5">
-                          {panel.dialogue[0].speaker_name}
+                          {formatSpeakerName(panel.dialogue[0].speaker_name)}
                         </p>
                         <p>{panel.dialogue[0].text}</p>
                       </div>

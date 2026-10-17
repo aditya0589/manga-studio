@@ -24,7 +24,7 @@ export default function StoryPlanningWorkspace() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { addNotification, setActiveProject } = useStudioStore();
+  const { addNotification, setActiveProject, setCurrentJob } = useStudioStore();
 
   const [activeTab, setActiveTab] = useState('premise');
   const [currentJobId, setCurrentJobId] = useState(null);
@@ -74,8 +74,18 @@ export default function StoryPlanningWorkspace() {
       synopsis: project?.synopsis || "Introduction to hero and first trial."
     }),
     onSuccess: (job) => {
+      if (job && job.id) {
+        setCurrentJob({
+          id: job.id,
+          progress: job.progress || 10,
+          stage: 'Launching Manga Director & Art Agents...',
+          status: 'running'
+        });
+        navigate(`/projects/${projectId}/editor?job_id=${job.id}`);
+      } else {
+        navigate(`/projects/${projectId}/editor`);
+      }
       addNotification('Chapter 1 workflow launched with Director and Art agents!', 'success');
-      navigate(`/projects/${projectId}/editor`);
     },
     onError: (err) => {
       addNotification(`Failed to launch chapter: ${err.message}`, 'error');

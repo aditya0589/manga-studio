@@ -3,6 +3,7 @@ from typing import Dict, Any, List
 from app.agents.graph.state import MangaWorkflowState
 from app.providers import get_llm_provider
 from app.core.logging import logger
+from app.workers.job_manager import job_manager
 
 async def story_ingestion_node(state: MangaWorkflowState) -> Dict[str, Any]:
     """Agent 1: Story Ingestion Agent
@@ -145,6 +146,17 @@ async def chapter_planner_node(state: MangaWorkflowState) -> Dict[str, Any]:
     Plans chapter progression, objectives, story beats, and scene breakdown.
     Reads previous chapter summaries to ensure continuous story flow."""
     logger.info("Executing Agent 4: Chapter Planner Agent")
+    job_id = state.get("job_id")
+    if job_id:
+        await job_manager.broadcast_event(
+            job_id,
+            "stage_started",
+            {
+                "stage": "📋 Chapter Planner Agent: Structuring narrative beats and pacing...",
+                "progress": 20
+            }
+        )
+
     llm = get_llm_provider()
 
     chapter_num = state.get("chapter_number", 1)

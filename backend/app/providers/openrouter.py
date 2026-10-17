@@ -154,6 +154,21 @@ class OpenRouterProvider(BaseLLMProvider):
                         await asyncio.sleep(wait_time)
                         last_error = str(e)
 
+        # Fallback to Cloudflare LLM if OpenRouter is down or rate-limited
+        if settings.is_image_provider_configured:
+            logger.info("OpenRouter unavailable or rate-limited. Falling back to Cloudflare Workers AI LLM.")
+            try:
+                from app.providers.cloudflare_llm import CloudflareLLMProvider
+                return await CloudflareLLMProvider().generate_text(
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_format_json=response_format_json
+                )
+            except Exception as e:
+                logger.error(f"Fallback to Cloudflare LLM failed: {e}")
+
         return {
             "content": "",
             "parsed_json": None,

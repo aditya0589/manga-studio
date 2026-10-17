@@ -192,7 +192,7 @@ async def generate_story_bible(
 
 async def run_chapter_generation_job(job_id: str, project_id: str, user_id: str, chapter_id: str):
     """Background execution for full chapter generation (planning, scenes, panels, artwork, critic)."""
-    await job_manager.broadcast_event(job_id, "job_started", {"stage": "plan_chapter", "progress": 10})
+    await job_manager.broadcast_event(job_id, "job_started", {"stage": "Initializing 9-Agent Manga Studio Workflow...", "progress": 10})
 
     async with AsyncSessionLocal() as session:
         project = await session.get(Project, project_id)
@@ -335,12 +335,28 @@ async def run_chapter_generation_job(job_id: str, project_id: str, user_id: str,
                         await session.flush()
                         asset_id = asset.id
 
+                    # Clean dialogue speaker names
+                    raw_dialogue = p_script.get("dialogue", [])
+                    clean_dialogue = []
+                    for d in raw_dialogue:
+                        if isinstance(d, dict):
+                            d_copy = dict(d)
+                            spk = str(d_copy.get("speaker_name", "Character")).strip()
+                            if ":" in spk:
+                                spk = spk.split(":", 1)[0].strip()
+                            if "(" in spk:
+                                spk = spk.split("(", 1)[0].strip()
+                            d_copy["speaker_name"] = spk or "Character"
+                            clean_dialogue.append(d_copy)
+                        else:
+                            clean_dialogue.append(d)
+
                     panel = Panel(
                         page_id=page.id,
                         panel_number=p_script.get("panel_number", 1),
                         script=p_script.get("script"),
                         image_prompt=p_script.get("image_prompt"),
-                        dialogue=p_script.get("dialogue", []),
+                        dialogue=clean_dialogue,
                         narration=p_script.get("narration", []),
                         sound_effects=p_script.get("sound_effects", []),
                         layout_config=p_script.get("layout_config", {}),

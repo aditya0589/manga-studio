@@ -17,29 +17,32 @@ export function useSSE(jobId, onComplete) {
     eventSource.addEventListener('job_started', (e) => {
       try {
         const data = JSON.parse(e.data);
-        updateJobProgress(data.progress || 10, data.stage || 'Starting...');
+        updateJobProgress(data.progress || 10, data.stage || 'Starting...', data);
       } catch {}
     });
 
     eventSource.addEventListener('stage_started', (e) => {
       try {
         const data = JSON.parse(e.data);
-        updateJobProgress(data.progress, data.stage);
-        addNotification(`Stage: ${data.stage}`, 'info');
+        updateJobProgress(data.progress, data.stage, data);
+        addNotification(data.stage, 'info');
       } catch {}
     });
 
     eventSource.addEventListener('progress_updated', (e) => {
       try {
         const data = JSON.parse(e.data);
-        updateJobProgress(data.progress, data.stage);
+        updateJobProgress(data.progress, data.stage, data);
       } catch {}
     });
 
     eventSource.addEventListener('asset_generated', (e) => {
       try {
         const data = JSON.parse(e.data);
-        addNotification(`Asset generated for panel ${data.panel_number || ''}`, 'success');
+        updateJobProgress(data.progress, data.stage, data);
+        addNotification(`Panel ${data.panel_number || ''} artwork synthesized!`, 'success');
+        // Instantly refresh canvas queries as each panel is generated
+        queryClient.invalidateQueries();
       } catch {}
     });
 
@@ -53,8 +56,8 @@ export function useSSE(jobId, onComplete) {
     eventSource.addEventListener('job_completed', (e) => {
       try {
         const data = JSON.parse(e.data);
-        updateJobProgress(100, 'Completed');
-        addNotification('Generation completed successfully!', 'success');
+        updateJobProgress(100, 'Generation completed successfully!', { status: 'completed' });
+        addNotification('Manga generation completed successfully!', 'success');
         queryClient.invalidateQueries();
         if (onComplete) onComplete(data);
       } catch {}
@@ -64,6 +67,7 @@ export function useSSE(jobId, onComplete) {
     eventSource.addEventListener('job_failed', (e) => {
       try {
         const data = JSON.parse(e.data);
+        updateJobProgress(0, `Generation failed: ${data.error || 'Unknown error'}`, { status: 'failed', error: data.error });
         addNotification(`Generation failed: ${data.error || 'Unknown error'}`, 'error');
       } catch {}
       eventSource.close();
