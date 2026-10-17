@@ -222,5 +222,15 @@ __marimo__/
 # Local media storage & sqlite databases
 media/
 backend/media/
+backend/media/*
 *.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+backend/manga_studio.db
 backend/*.db
+*.bak
+*_bak/
+
+
